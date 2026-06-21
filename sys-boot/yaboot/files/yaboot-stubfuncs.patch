@@ -20,7 +20,7 @@ Stub out some functions that are not provided (and unneeded)
  int posix_memalign(void **memptr, size_t alignment, size_t size)
 --- a/lib/nonstd.c
 +++ b/lib/nonstd.c
-@@ -65,3 +65,208 @@
+@@ -65,3 +65,212 @@
  {
  	return NULL;
  }
@@ -220,7 +220,11 @@ Stub out some functions that are not provided (and unneeded)
 +}
 +
 +unsigned long long int strtoull(const char *nptr, char **endptr, int base) {
-+	return 0;
++	return strtol(nptr, endptr, base);
++}
++
++unsigned long long int __isoc23_strtoull(const char *nptr, char **endptr, int base) {
++	return strtol(nptr, endptr, base);
 +}
 +
 +int getrlimit(int resource, void *rlim) {

@@ -1,0 +1,125 @@
+diff --git a/lib/blkid/llseek.c b/lib/blkid/llseek.c
+index 1cee34b41..2e61c2bfb 100644
+--- a/lib/blkid/llseek.c
++++ b/lib/blkid/llseek.c
+@@ -46,9 +46,9 @@ extern long long llseek(int fd, long long offset, int origin);
+ 
+ #else	/* ! HAVE_LLSEEK */
+ 
+-#if SIZEOF_LONG == SIZEOF_LONG_LONG
++#if SIZEOF_LONG == SIZEOF_LONG_LONG || SIZEOF_OFF_T == 8
+ 
+-#define llseek lseek
++#define my_llseek lseek
+ 
+ #else /* SIZEOF_LONG != SIZEOF_LONG_LONG */
+ 
+diff --git a/lib/ext2fs/llseek.c b/lib/ext2fs/llseek.c
+index 2730f20be..0dc7714f6 100644
+--- a/lib/ext2fs/llseek.c
++++ b/lib/ext2fs/llseek.c
+@@ -47,9 +47,10 @@ extern long long llseek (int fd, long long offset, int origin);
+ 
+ #else	/* ! HAVE_LLSEEK */
+ 
+-#if SIZEOF_LONG == SIZEOF_LONG_LONG
++#if SIZEOF_LONG == SIZEOF_LONG_LONG || SIZEOF_OFF_T == 8
++
++#define my_llseek lseek
+ 
+-#define llseek lseek
+ 
+ #else /* SIZEOF_LONG != SIZEOF_LONG_LONG */
+
+diff --git a/lib/uuid/gen_uuid.c b/lib/uuid/gen_uuid.c
+index 22b451342..01c5effdc 100644
+--- a/lib/uuid/gen_uuid.c
++++ b/lib/uuid/gen_uuid.c
+@@ -404,8 +404,8 @@ static int get_clock(uint32_t *clock_high, uint32_t *clock_low,
+ 		rewind(state_f);
+ 		len = fprintf(state_f,
+ 			      "clock: %04x tv: %016lu %08lu adj: %08d\n",
+-			      clock_seq, last.tv_sec, (long)last.tv_usec,
+-			      adjustment);
++			      clock_seq, (unsigned long)last.tv_sec,
++			      (unsigned long)last.tv_usec, adjustment);
+ 		fflush(state_f);
+ 		if (ftruncate(state_fd, len) < 0) {
+ 			fprintf(state_f, "                   \n");
+diff --git a/lib/uuid/tst_uuid.c b/lib/uuid/tst_uuid.c
+index 88d928fe9..649bfbc05 100644
+--- a/lib/uuid/tst_uuid.c
++++ b/lib/uuid/tst_uuid.c
+@@ -144,7 +144,8 @@ main(int argc ATTR((unused)) , char **argv ATTR((unused)))
+ 	tv.tv_usec = 0;
+ 	time_reg = uuid_time(buf, &tv);
+ 	printf("UUID generated at %lu reports %lu (%ld.%ld)\n",
+-	       time_gen, time_reg, tv.tv_sec, (long)tv.tv_usec);
++	       (unsigned long)time_gen, (unsigned long)time_reg,
++	       (long)tv.tv_sec, (long)tv.tv_usec);
+ 	/* allow 1s margin in case of rollover between sampling
+ 	 * the current time and when the UUID is generated. */
+ 	if (time_reg > time_gen + 1) {
+diff --git a/lib/uuid/uuid_time.c b/lib/uuid/uuid_time.c
+index 97fd33588..af837a2ca 100644
+--- a/lib/uuid/uuid_time.c
++++ b/lib/uuid/uuid_time.c
+@@ -165,7 +165,7 @@ main(int argc, char **argv)
+ 		printf("Warning: not a time-based UUID, so UUID time "
+ 		       "decoding will likely not work!\n");
+ 	}
+-	printf("UUID time is: (%ld, %ld): %s\n", tv.tv_sec, (long)tv.tv_usec,
++	printf("UUID time is: (%ld, %ld): %s\n", (long)tv.tv_sec, (long)tv.tv_usec,
+ 	       ctime(&time_reg));
+
+ 	return 0;
+
+diff --git a/lib/ext2fs/closefs.c b/lib/ext2fs/closefs.c
+index ab5b2fb23..d9fd4d0ae 100644
+--- a/lib/ext2fs/closefs.c
++++ b/lib/ext2fs/closefs.c
+@@ -281,7 +281,7 @@ errcode_t ext2fs_flush2(ext2_filsys fs, int flags)
+ 	unsigned long	fs_state;
+ 	__u32		feature_incompat;
+ 	struct ext2_super_block *super_shadow = 0;
+-	struct ext2_group_desc *group_shadow = 0;
++	struct opaque_ext2_group_desc *group_shadow = 0;
+ #ifdef WORDS_BIGENDIAN
+ 	struct ext2_group_desc *gdp;
+ 	dgrp_t		j;
+@@ -316,7 +316,7 @@ errcode_t ext2fs_flush2(ext2_filsys fs, int flags)
+ 	}
+ #else
+ 	super_shadow = fs->super;
+-	group_shadow = ext2fs_group_desc(fs, fs->group_desc, 0);
++	group_shadow = fs->group_desc;
+ #endif
+
+ 	/*
+
+diff --git a/misc/e4defrag.c b/misc/e4defrag.c
+index d0eac605b..9284d27af 100644
+--- a/misc/e4defrag.c
++++ b/misc/e4defrag.c
+@@ -197,10 +197,6 @@ static struct frag_statistic_ino	frag_rank[SHOW_FRAG_FILES];
+ #error sync_file_range not available!
+ #endif /* ! HAVE_SYNC_FILE_RANGE */
+ 
+-#ifndef HAVE_FALLOCATE64
+-#error fallocate64 not available!
+-#endif /* ! HAVE_FALLOCATE64 */
+-
+ /*
+  * get_mount_point() -	Get device's mount point.
+  *
+@@ -1554,7 +1550,7 @@ static int file_defrag(const char *file, const struct stat64 *buf,
+ 	/* Allocate space for donor inode */
+ 	orig_group_tmp = orig_group_head;
+ 	do {
+-		ret = fallocate64(donor_fd, 0,
++		ret = fallocate(donor_fd, 0,
+ 		  (loff_t)orig_group_tmp->start->data.logical * block_size,
+ 		  (loff_t)orig_group_tmp->len * block_size);
+ 		if (ret < 0) {
+
+
